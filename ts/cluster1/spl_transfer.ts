@@ -1,6 +1,6 @@
 import { Commitment, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js"
 import wallet from "../turbin3-wallet.json"
-import { getOrCreateAssociatedTokenAccount, transfer } from "@solana/spl-token";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, transfer } from "@solana/spl-token";
 
 // We're going to import our keypair from the wallet file
 const keypair = Keypair.fromSecretKey(new Uint8Array(wallet));
@@ -14,7 +14,7 @@ const mint = new PublicKey("Hpbn3zRnnKUHYhDBKAqx8pss3zvbqEg4qb8nEMu2rGVa");
 const token_decimals = 1_000_000n;
 
 // Recipient address
-const to = new PublicKey("73SaNUM9tU15Qm4ytGcp9oXajPeCfCryP7zoZVe9mzxU");
+const to = new PublicKey("EfDWrJMpg3ExKSYQZWnCKQrZMFAa3xmuJGzmkiKNov63");
 
 (async () => {
     try {
@@ -24,27 +24,38 @@ const to = new PublicKey("73SaNUM9tU15Qm4ytGcp9oXajPeCfCryP7zoZVe9mzxU");
             keypair,
             mint,
             keypair.publicKey,
-        );
+        )
+        // const ata = getAssociatedTokenAddressSync(
+        //     mint,
+        //     keypair.publicKey,
+        // )
+        // const ata = createAssociatedTokenAccountInstruction()
         console.log(`Your ata is: ${ata.address.toBase58()}`);
 
-        // Get the token account of the toWallet address, and if it does not exist, create it
         const toAta = await getOrCreateAssociatedTokenAccount(
             connection,
             keypair,
             mint,
             to,
-        );
+        )
+        // const toAta = getAssociatedTokenAddressSync(
+        //     mint,
+        //     to
+        // )
+        // const toAta = PublicKey.findProgramAddressSync(
+        //     [to.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        //     ASSOCIATED_TOKEN_PROGRAM_ID,
+        // )[0]
         console.log(`Your to ata is: ${toAta.address.toBase58()}`);
 
-        // Transfer the new token to the "toTokenAccount" we just created
         const transferTx = await transfer(
             connection,
             keypair,
             ata.address,
             toAta.address,
-            keypair.publicKey,
+            keypair,
             1_000n * token_decimals,
-        );
+        )
         console.log(`Your transfer txid: ${transferTx}`);
     } catch(e) {
         console.error(`Oops, something went wrong: ${e}`)
