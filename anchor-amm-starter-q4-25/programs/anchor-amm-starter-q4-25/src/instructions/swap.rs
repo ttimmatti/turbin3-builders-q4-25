@@ -24,7 +24,7 @@ pub struct Swap<'info> {
         seeds = [b"lp", config.key().as_ref()],
         mint::decimals = 6,
         mint::authority = config,
-        bump = config.config_bump,
+        bump = config.lp_bump,
     )]
     pub mint_lp: Account<'info, Mint>,
 
@@ -44,13 +44,13 @@ pub struct Swap<'info> {
     #[account(
         mut,
         associated_token::mint = mint_x,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_x: Account<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = mint_y,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_y: Account<'info, TokenAccount>,
 
@@ -113,8 +113,8 @@ impl<'info> Swap<'info> {
 
     pub fn withdraw_tokens(&mut self, is_x: bool, amount: u64) -> Result<()> {
         let signer_seeds: [&[&[u8]]; 1] = [&[
-            b"lp",
-            self.config.to_account_info().key.as_ref(),
+            b"config",
+            &self.config.seed.to_le_bytes(),
             &[self.config.config_bump],
         ]];
 

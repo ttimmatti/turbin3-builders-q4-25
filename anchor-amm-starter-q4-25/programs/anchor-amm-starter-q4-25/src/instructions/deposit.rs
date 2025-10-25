@@ -25,7 +25,7 @@ pub struct Deposit<'info> {
         seeds = [b"lp", config.key().as_ref()],
         mint::decimals = 6,
         mint::authority = config,
-        bump = config.config_bump,
+        bump = config.lp_bump,
     )]
     pub mint_lp: Account<'info, Mint>,
 
@@ -45,13 +45,13 @@ pub struct Deposit<'info> {
     #[account(
         mut,
         associated_token::mint = mint_x,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_x: Account<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = mint_y,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_y: Account<'info, TokenAccount>,
 
@@ -59,7 +59,7 @@ pub struct Deposit<'info> {
         init_if_needed,
         payer = signer,
         associated_token::mint = mint_lp,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_lp: Account<'info, TokenAccount>,
 
@@ -91,6 +91,9 @@ impl<'info> Deposit<'info> {
         };
 
         require!(x <= max_x && y <= max_y, AmmError::SlippageExceeded);
+
+        let (from_x, to_x) = (self.user_x.amount, self.vault_x.amount);
+        msg!("Depositing tokens: x = {}, y = {}, from_x = {}, to_x = {}", x, y, from_x, to_x);
 
         self.deposit_tokens(true, x)?;
         self.deposit_tokens(false, y)?;
@@ -126,16 +129,16 @@ impl<'info> Deposit<'info> {
 
     pub fn mint_lp_tokens(&mut self, amount: u64) -> Result<()> {
         let signer_seeds: [&[&[u8]]; 1] = [&[
-            b"lp",
-            self.config.to_account_info().key.as_ref(),
+            b"config",
+            &self.config.seed.to_le_bytes(),
             &[self.config.config_bump],
         ]];
 
         let mint_ctx = CpiContext::new_with_signer(
-            self.mint_lp.to_account_info(),
+            self.token_program.to_account_info(),
             MintTo {
                 mint: self.mint_lp.to_account_info(),
-                to: self.signer.to_account_info(),
+                to: self.user_lp.to_account_info(),
                 authority: self.config.to_account_info()
             },
             &signer_seeds

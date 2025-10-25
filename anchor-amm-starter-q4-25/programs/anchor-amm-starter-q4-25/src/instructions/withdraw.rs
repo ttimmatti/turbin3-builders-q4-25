@@ -25,7 +25,7 @@ pub struct Withdraw<'info> {
         seeds = [b"lp", config.key().as_ref()],
         mint::decimals = 6,
         mint::authority = config,
-        bump = config.config_bump,
+        bump = config.lp_bump,
     )]
     pub mint_lp: Account<'info, Mint>,
 
@@ -45,20 +45,20 @@ pub struct Withdraw<'info> {
     #[account(
         mut,
         associated_token::mint = mint_x,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_x: Account<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = mint_y,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_y: Account<'info, TokenAccount>,
 
     #[account(
         mut,
         associated_token::mint = mint_lp,
-        associated_token::authority = config,
+        associated_token::authority = signer,
     )]
     pub user_lp: Account<'info, TokenAccount>,
 
@@ -107,7 +107,7 @@ impl<'info> Withdraw<'info> {
     pub fn withdraw_tokens(&self, is_x: bool, amount: u64) -> Result<()> {
         let signer_seeds: [&[&[u8]]; 1] = [&[
             b"config",
-            self.config.to_account_info().key.as_ref(),
+            &self.config.seed.to_le_bytes(),
             &[self.config.config_bump],
         ]];
 
@@ -127,7 +127,7 @@ impl<'info> Withdraw<'info> {
             Transfer {
                 from,
                 to,
-                authority: self.signer.to_account_info()
+                authority: self.config.to_account_info()
             },
             &signer_seeds
         );
