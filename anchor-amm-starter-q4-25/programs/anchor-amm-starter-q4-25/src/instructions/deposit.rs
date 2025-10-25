@@ -90,6 +90,8 @@ impl<'info> Deposit<'info> {
             }
         };
 
+        require!(x <= max_x && y <= max_y, AmmError::SlippageExceeded);
+
         self.deposit_tokens(true, x)?;
         self.deposit_tokens(false, y)?;
 

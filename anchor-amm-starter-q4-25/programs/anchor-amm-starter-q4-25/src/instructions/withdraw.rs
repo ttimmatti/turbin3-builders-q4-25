@@ -94,6 +94,8 @@ impl<'info> Withdraw<'info> {
             }
         };
 
+        require!(x >= min_x && y >= min_y, AmmError::SlippageExceeded);
+
         self.withdraw_tokens(true, x)?;
         self.withdraw_tokens(false, y)?;
 
