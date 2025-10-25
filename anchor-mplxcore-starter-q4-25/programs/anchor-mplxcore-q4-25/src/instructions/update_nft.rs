@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use mpl_core::{
-    accounts::BaseAssetV1, instructions::{UpdateV1CpiBuilder}, types::{UpdateAuthority}, ID as CORE_PROGRAM_ID
+    accounts::BaseAssetV1, instructions::{UpdateV1CpiBuilder}, ID as CORE_PROGRAM_ID
 };
 
 use crate::{error::MPLXCoreError, state::CollectionAuthority};
