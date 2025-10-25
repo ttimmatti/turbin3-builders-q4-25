@@ -76,23 +76,18 @@ impl<'info> Withdraw<'info> {
     ) -> Result<()> {
         require!(self.config.locked == false, AmmError::PoolLocked);
         
-        let (x, y) = match self.mint_lp.supply == 0
-            && self.vault_x.amount == 0
-            && self.vault_y.amount == 0
-        {
-            true => (min_x, min_y),
-            false => {
-                let amounts: XYAmounts = ConstantProduct::xy_withdraw_amounts_from_l(
-                    self.vault_x.amount,
-                    self.vault_y.amount,
-                    self.mint_lp.supply,
-                    amount,
-                    6
-                )
-                .unwrap();
-                (amounts.x, amounts.y)
-            }
-        };
+        // xy_withdraw_amounts_from_l returns more tokens than last deposit for the same amount of lp ?
+        // xy_deposit_amounts_from_l won't work because curve would scale differently upwards than downwards
+        let amounts: XYAmounts = ConstantProduct::xy_withdraw_amounts_from_l(
+            self.vault_x.amount,
+            self.vault_y.amount,
+            self.mint_lp.supply,
+            amount,
+            10_u32.pow(6)
+        )
+        .unwrap();
+
+        let (x, y) = (amounts.x, amounts.y);
 
         require!(x >= min_x && y >= min_y, AmmError::SlippageExceeded);
 
