@@ -4,6 +4,7 @@ import { AnchorMplxcoreQ425 } from "../target/types/anchor_mplxcore_q4_25";
 import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
 import { assert } from "chai";
 import { MPL_CORE_PROGRAM_ID } from "@metaplex-foundation/mpl-core";
+import { getAssetV1AccountDataSerializer } from "@metaplex-foundation/mpl-core/dist/src/generated/types/assetV1AccountData";
 
 describe("anchor-mplxcore-q4-25", () => {
   // Configure the client to use the local cluster.
@@ -300,6 +301,30 @@ describe("anchor-mplxcore-q4-25", () => {
       } catch (err) {
         assert.equal(err.error.errorCode.code, "NotAuthorized", "Expected NotAuthorized error");
       }
+    });
+
+    it("Update an NFT", async () => {
+      const newName = "New Name";
+      const newUri = "https://example.com/new-uri";
+
+      await program.methods
+        .updateNft(newName, newUri)
+        .accountsStrict({
+          authority: creator.publicKey,
+          asset: asset.publicKey,
+          collection: collection.publicKey,
+          collectionAuthority: collectionAuthorityPda,
+          coreProgram: MPL_CORE_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([creator])
+        .rpc();
+
+      const assetAccount = await provider.connection.getAccountInfo(asset.publicKey);
+      const [baseAsset] = getAssetV1AccountDataSerializer().deserialize(assetAccount?.data);
+
+      assert.equal(baseAsset.name, newName, "Name should be updated");
+      assert.equal(baseAsset.uri, newUri, "URI should be updated");
     });
   });
 });
