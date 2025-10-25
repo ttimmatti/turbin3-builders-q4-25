@@ -12,6 +12,9 @@ pub struct ThawNft<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub collection: Signer<'info>,
+    #[account(mut)]
+    /// CHECK: This will also be checked by core
+    pub asset: UncheckedAccount<'info>,
     #[account(
         seeds = [b"collection_authority", collection.key().as_ref()],
         bump
@@ -37,10 +40,12 @@ impl<'info> ThawNft<'info> {
         ]];
 
         UpdatePluginV1CpiBuilder::new(&self.core_program.to_account_info())
+            .asset(&self.asset.to_account_info())
             .collection(Some(&self.collection.to_account_info()))
-            .plugin(Plugin::FreezeDelegate(FreezeDelegate { frozen: false }))
+            .payer(&self.payer.to_account_info())
             .authority(Some(&self.collection_authority.to_account_info()))
             .system_program(&self.system_program.to_account_info())
+            .plugin(Plugin::FreezeDelegate(FreezeDelegate { frozen: false }))
             .invoke_signed(signer_seeds)?;
 
         Ok(())
