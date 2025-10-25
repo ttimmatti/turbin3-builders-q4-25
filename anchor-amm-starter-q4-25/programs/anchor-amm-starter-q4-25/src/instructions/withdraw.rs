@@ -76,8 +76,6 @@ impl<'info> Withdraw<'info> {
     ) -> Result<()> {
         require!(self.config.locked == false, AmmError::PoolLocked);
         
-        // xy_withdraw_amounts_from_l returns more tokens than last deposit for the same amount of lp ?
-        // xy_deposit_amounts_from_l won't work because curve would scale differently upwards than downwards
         let amounts: XYAmounts = ConstantProduct::xy_withdraw_amounts_from_l(
             self.vault_x.amount,
             self.vault_y.amount,
