@@ -75,6 +75,8 @@ impl<'info> Withdraw<'info> {
         min_y: u64,  // Minimum amount of token Y that the user wants to receive
     ) -> Result<()> {
         require!(self.config.locked == false, AmmError::PoolLocked);
+
+        require!(self.mint_lp.supply != 0, AmmError::NoLiquidityInPool);
         
         let amounts: XYAmounts = ConstantProduct::xy_withdraw_amounts_from_l(
             self.vault_x.amount,
