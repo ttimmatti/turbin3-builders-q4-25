@@ -1,0 +1,15 @@
+.idea
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
+
+# next.js
+.next/
+out/
+
+# production
+/build
