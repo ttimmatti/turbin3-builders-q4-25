@@ -19,4 +19,8 @@ pub mod anchor_amm_starter_q4_25 {
     pub fn deposit(ctx: Context<Deposit>, amount: u64, max_x: u64, max_y: u64) -> Result<()> {
         ctx.accounts.deposit(amount, max_x, max_y)
     }
+
+    pub fn withdraw(ctx: Context<Withdraw>, amount: u64, min_x: u64, min_y: u64) -> Result<()> {
+        ctx.accounts.withdraw(amount, min_x, min_y)
+    }
 }

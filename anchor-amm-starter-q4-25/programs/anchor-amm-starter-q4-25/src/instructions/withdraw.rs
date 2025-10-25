@@ -1,19 +1,19 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{mint_to, transfer, Mint, MintTo, Token, TokenAccount, Transfer},
+    token::{burn, transfer, Burn, Mint, Token, TokenAccount, Transfer},
 };
 use constant_product_curve::{ConstantProduct, XYAmounts};
 
 use crate::{error::AmmError, state::Config};
 
 #[derive(Accounts)]
-pub struct Deposit<'info> {
+pub struct Withdraw<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     pub mint_x: Account<'info, Mint>,
     pub mint_y: Account<'info, Mint>,
-    
+
     #[account(
         mut,
         seeds = [b"config", config.seed.to_le_bytes().as_ref()],
@@ -56,8 +56,7 @@ pub struct Deposit<'info> {
     pub user_y: Account<'info, TokenAccount>,
 
     #[account(
-        init_if_needed,
-        payer = signer,
+        mut,
         associated_token::mint = mint_lp,
         associated_token::authority = config,
     )]
@@ -68,17 +67,22 @@ pub struct Deposit<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> Deposit<'info> {
-    pub fn deposit(&mut self, amount: u64, max_x: u64, max_y: u64) -> Result<()> {
+impl<'info> Withdraw<'info> {
+    pub fn withdraw(
+        &mut self,
+        amount: u64, // Amount of LP tokens that the user wants to "burn"
+        min_x: u64,  // Minimum amount of token X that the user wants to receive
+        min_y: u64,  // Minimum amount of token Y that the user wants to receive
+    ) -> Result<()> {
         require!(self.config.locked == false, AmmError::PoolLocked);
         
         let (x, y) = match self.mint_lp.supply == 0
             && self.vault_x.amount == 0
             && self.vault_y.amount == 0
         {
-            true => (max_x, max_y),
+            true => (min_x, min_y),
             false => {
-                let amounts: XYAmounts = ConstantProduct::xy_deposit_amounts_from_l(
+                let amounts: XYAmounts = ConstantProduct::xy_withdraw_amounts_from_l(
                     self.vault_x.amount,
                     self.vault_y.amount,
                     self.mint_lp.supply,
@@ -90,55 +94,55 @@ impl<'info> Deposit<'info> {
             }
         };
 
-        self.deposit_tokens(true, x)?;
-        self.deposit_tokens(false, y)?;
+        self.withdraw_tokens(true, x)?;
+        self.withdraw_tokens(false, y)?;
 
-        self.mint_lp_tokens(amount)?;
+        self.burn_lp_tokens(amount)?;
 
         Ok(())
     }
 
-    pub fn deposit_tokens(&mut self, is_x: bool, amount: u64) -> Result<()> {
+    pub fn withdraw_tokens(&self, is_x: bool, amount: u64) -> Result<()> {
+        let signer_seeds: [&[&[u8]]; 1] = [&[
+            b"config",
+            self.config.to_account_info().key.as_ref(),
+            &[self.config.config_bump],
+        ]];
+
         let (from, to) = match is_x {
             true => (
-                self.user_x.to_account_info(),
                 self.vault_x.to_account_info(),
+                self.user_x.to_account_info(),
             ),
             false => (
-                self.user_y.to_account_info(),
                 self.vault_y.to_account_info(),
+                self.user_y.to_account_info(),
             )
         };
 
-        let transfer_ctx = CpiContext::new(
+        let transfer_ctx = CpiContext::new_with_signer(
             self.token_program.to_account_info(),
             Transfer {
                 from,
                 to,
                 authority: self.signer.to_account_info()
             },
+            &signer_seeds
         );
 
         transfer(transfer_ctx, amount)
     }
 
-    pub fn mint_lp_tokens(&mut self, amount: u64) -> Result<()> {
-        let signer_seeds: [&[&[u8]]; 1] = [&[
-            b"lp",
-            self.config.to_account_info().key.as_ref(),
-            &[self.config.config_bump],
-        ]];
-
-        let mint_ctx = CpiContext::new_with_signer(
+    pub fn burn_lp_tokens(&self, amount: u64) -> Result<()> {
+        let mint_ctx = CpiContext::new(
             self.mint_lp.to_account_info(),
-            MintTo {
+            Burn {
                 mint: self.mint_lp.to_account_info(),
-                to: self.signer.to_account_info(),
-                authority: self.config.to_account_info()
+                from: self.signer.to_account_info(),
+                authority: self.signer.to_account_info()
             },
-            &signer_seeds
         );
 
-        mint_to(mint_ctx, amount)
+        burn(mint_ctx, amount)
     }
 }
