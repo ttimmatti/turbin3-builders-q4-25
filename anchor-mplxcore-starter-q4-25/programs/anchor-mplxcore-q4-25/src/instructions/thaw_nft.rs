@@ -11,7 +11,13 @@ use crate::{error::MPLXCoreError, state::CollectionAuthority};
 pub struct ThawNft<'info> {
     #[account(mut, constraint = authority.key() == collection_authority.creator @ MPLXCoreError::NotAuthorized)]
     pub authority: Signer<'info>,
-    pub collection: Signer<'info>,
+    #[account(
+        mut,
+        constraint = collection.owner == &CORE_PROGRAM_ID @ MPLXCoreError::InvalidCollection,
+        constraint = collection.key() == collection_authority.collection @ MPLXCoreError::InvalidCollection,
+    )]
+    /// CHECK: This will also be checked by core
+    pub collection: UncheckedAccount<'info>,
     #[account(mut)]
     /// CHECK: This will also be checked by core
     pub asset: UncheckedAccount<'info>,
