@@ -138,7 +138,7 @@ impl<'info> Withdraw<'info> {
             self.mint_lp.to_account_info(),
             Burn {
                 mint: self.mint_lp.to_account_info(),
-                from: self.signer.to_account_info(),
+                from: self.user_lp.to_account_info(),
                 authority: self.signer.to_account_info()
             },
         );
