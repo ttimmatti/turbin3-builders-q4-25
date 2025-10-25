@@ -76,6 +76,7 @@ impl<'info> MintNft<'info> {
                     authority: None,
                 },
                 PluginAuthorityPair {
+                    // why is it frozen by default?
                     plugin: Plugin::FreezeDelegate(FreezeDelegate { frozen: true }),
                     authority: Some(PluginAuthority::Address {
                         address: self.collection_authority.key(),
