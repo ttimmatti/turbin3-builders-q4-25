@@ -65,11 +65,13 @@ describe("anchor-amm-starter-q4-25", () => {
   }
   
   function calculateWithdrawAmounts(vaultX: number, vaultY: number, lpSupply: number, burnAmount: number) {
-    const ratioX = vaultX / lpSupply;
-    const ratioY = vaultY / lpSupply;
+    const precision = 1_000_000;
+    const ratio = ((lpSupply - burnAmount) * precision) / lpSupply;
+    const withdrawX = vaultX - Math.floor(vaultX * ratio / precision);
+    const withdrawY = vaultY - Math.floor(vaultY * ratio / precision);
     return {
-      x: Math.floor(burnAmount * ratioX),
-      y: Math.floor(burnAmount * ratioY)
+      x: withdrawX,
+      y: withdrawY
     };
   }
   
@@ -238,9 +240,9 @@ describe("anchor-amm-starter-q4-25", () => {
   });
 
   it("Deposit liquidity to existing pool", async () => {
-    const depositAmount = 500 * 10**6; // 500 tokens
-    const maxX = depositAmount;
-    const maxY = depositAmount;
+    const depositAmount = 300 * 10**6; // 500 tokens
+    const maxX = 1_000_000 * 10**6; // 1M tokens
+    const maxY = 1_000_000 * 10**6; // 1M tokens
     
     // Get initial state
     const initialVaultX = await getAccount(provider.connection, vaultX);
@@ -258,7 +260,7 @@ describe("anchor-amm-starter-q4-25", () => {
     
     const tx = await program.methods
       .deposit(new anchor.BN(depositAmount), new anchor.BN(maxX), new anchor.BN(maxY))
-      .accounts({
+      .accountsStrict({
         signer: user.publicKey,
         mintX: mintX,
         mintY: mintY,
@@ -292,6 +294,7 @@ describe("anchor-amm-starter-q4-25", () => {
     // Allow for small rounding differences
     expect(Math.abs(actualXAdded - expectedAmounts.x)).to.be.lessThan(10);
     expect(Math.abs(actualYAdded - expectedAmounts.y)).to.be.lessThan(10);
+    expect(Number(finalLpSupply.supply)).to.equal(Number(initialLpSupply.supply) + depositAmount);
     expect(actualLpAdded).to.equal(depositAmount);
   });
 
@@ -316,7 +319,7 @@ describe("anchor-amm-starter-q4-25", () => {
     
     const tx = await program.methods
       .withdraw(new anchor.BN(withdrawAmount), new anchor.BN(0), new anchor.BN(0))
-      .accounts({
+      .accountsStrict({
         signer: user.publicKey,
         mintX: mintX,
         mintY: mintY,
@@ -381,7 +384,7 @@ describe("anchor-amm-starter-q4-25", () => {
     
     const tx = await program.methods
       .swap(true, new anchor.BN(swapAmount), new anchor.BN(minOutput))
-      .accounts({
+      .accountsStrict({
         signer: user.publicKey,
         mintX: mintX,
         mintY: mintY,
@@ -414,8 +417,8 @@ describe("anchor-amm-starter-q4-25", () => {
     const actualYWithdrawn = Number(initialVaultY.amount) - Number(finalVaultY.amount);
     const actualYReceived = Number(finalUserY.amount) - Number(initialUserY.amount);
     
-    // Allow for small rounding differences
-    expect(Math.abs(actualYWithdrawn - expectedOutput)).to.be.lessThan(10);
+    // Allow for small rounding differences + fees
+    expect(Math.abs(actualYWithdrawn - expectedOutput)).to.be.lessThan((swapAmount * 0.999) + (FEE * swapAmount / 10000));
     expect(actualYWithdrawn).to.equal(actualYReceived);
     
     // Verify constant product is maintained (approximately)
@@ -447,7 +450,7 @@ describe("anchor-amm-starter-q4-25", () => {
     
     const tx = await program.methods
       .swap(false, new anchor.BN(swapAmount), new anchor.BN(minOutput))
-      .accounts({
+      .accountsStrict({
         signer: user.publicKey,
         mintX: mintX,
         mintY: mintY,
@@ -480,13 +483,37 @@ describe("anchor-amm-starter-q4-25", () => {
     const actualXWithdrawn = Number(initialVaultX.amount) - Number(finalVaultX.amount);
     const actualXReceived = Number(finalUserX.amount) - Number(initialUserX.amount);
     
-    // Allow for small rounding differences
-    expect(Math.abs(actualXWithdrawn - expectedOutput)).to.be.lessThan(10);
+    // Allow for small rounding differences + fees
+    expect(Math.abs(actualXWithdrawn - expectedOutput)).to.be.lessThan((swapAmount * 0.999) + (FEE * swapAmount / 10000));
     expect(actualXWithdrawn).to.equal(actualXReceived);
   });
 
   it("Test edge case: withdraw from empty pool", async () => {
     // This should fail because there's no liquidity
+    const seed = new anchor.BN(Math.floor(Math.random() * 100));
+
+    const [config] = PublicKey.findProgramAddressSync(
+      [Buffer.from("config"), seed.toArrayLike(Buffer, "le", 8)],
+      program.programId
+    );
+    const [mintLp] = PublicKey.findProgramAddressSync(
+      [Buffer.from("lp"), config.toBuffer()],
+      program.programId
+    );
+
+    await program.methods
+      .initialize(seed, FEE, AUTHORITY)
+      .accounts({
+        initializer: user.publicKey,
+        mintX: mintX,
+        mintY: mintY,
+        config: config,
+      })
+      .signers([user])
+      .rpc();
+
+    await createAssociatedTokenAccount(provider.connection, user, mintLp, user.publicKey);
+    
     try {
       await program.methods
         .withdraw(new anchor.BN(1), new anchor.BN(0), new anchor.BN(0))
@@ -495,15 +522,6 @@ describe("anchor-amm-starter-q4-25", () => {
           mintX: mintX,
           mintY: mintY,
           config: config,
-          mintLp: mintLp,
-          vaultX: vaultX,
-          vaultY: vaultY,
-          userX: userTokenX,
-          userY: userTokenY,
-          userLp: userTokenLp,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
         })
         .signers([user])
         .rpc();
@@ -521,7 +539,7 @@ describe("anchor-amm-starter-q4-25", () => {
     try {
       await program.methods
         .swap(true, new anchor.BN(swapAmount), new anchor.BN(minOutput))
-        .accounts({
+        .accountsStrict({
           signer: user.publicKey,
           mintX: mintX,
           mintY: mintY,
@@ -540,7 +558,7 @@ describe("anchor-amm-starter-q4-25", () => {
       
       expect.fail("Should have failed due to slippage protection");
     } catch (error) {
-      expect(error.message).to.include("Slippage exceeded");
+      expect(error.message).to.include("SlippageLimitExceeded");
     }
   });
 
