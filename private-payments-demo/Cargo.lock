@@ -1571,7 +1571,8 @@ dependencies = [
 
 [[package]]
 name = "session-keys"
-version = "2.0.7"
+version = "2.0.8"
+source = "git+https://github.com/magicblock-labs/session-keys.git#e17bf310e624a53bc3e8ba331863a75999f00296"
 dependencies = [
  "anchor-lang",
  "session-keys-macros",
@@ -1580,14 +1581,16 @@ dependencies = [
 
 [[package]]
 name = "session-keys-macros"
-version = "0.1.1"
+version = "0.1.2"
+source = "git+https://github.com/magicblock-labs/session-keys.git#e17bf310e624a53bc3e8ba331863a75999f00296"
 dependencies = [
  "session-keys-macros-attribute",
 ]
 
 [[package]]
 name = "session-keys-macros-attribute"
-version = "0.1.0"
+version = "0.1.2"
+source = "git+https://github.com/magicblock-labs/session-keys.git#e17bf310e624a53bc3e8ba331863a75999f00296"
 dependencies = [
  "proc-macro2",
  "quote",
