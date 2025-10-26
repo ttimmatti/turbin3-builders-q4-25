@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+// import { PrivatePayments } from "../target/types/private_payments";
 import { PrivatePayments } from "../target/types/private_payments";
 import {
   groupPdaFromId,
@@ -7,7 +8,8 @@ import {
   permissionPdaFromAccount,
 } from "@magicblock-labs/ephemeral-rollups-sdk/privacy";
 import { DEPOSIT_PDA_SEED, VAULT_PDA_SEED } from "../frontend/lib/constants";
-import privatePaymentsIdl from "../frontend/program/private_payments.json";
+// import privatePaymentsIdl from "../frontend/program/private_payments.json";
+import privatePaymentsIdl from "../target/idl/private_payments.json";
 import {
   createAssociatedTokenAccountIdempotent,
   createMint,
@@ -24,20 +26,23 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 
+// localnet validator
+const ER_VALIDATOR = new PublicKey("mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev");
+
 describe("private-payments", () => {
   const userKp = Keypair.generate();
   const wallet = new anchor.Wallet(userKp);
   const otherUserKp = Keypair.generate();
 
   const provider = new anchor.AnchorProvider(
-    new anchor.web3.Connection("https://api.devnet.solana.com", {
-      wsEndpoint: "wss://api.devnet.solana.com",
+    new anchor.web3.Connection("http://localhost:8899", {
+      wsEndpoint: "ws://localhost:8900",
     }),
     wallet
   );
   const ephemeralProvider = new anchor.AnchorProvider(
-    new anchor.web3.Connection("http://0.0.0.0:8899", {
-      wsEndpoint: "ws://0.0.0.0:8900",
+    new anchor.web3.Connection("http://localhost:7799", {
+      wsEndpoint: "ws://localhost:7800",
     }),
     wallet
   );
@@ -291,7 +296,7 @@ describe("private-payments", () => {
     ]) {
       const tx = await program.methods
         .delegate(kp.publicKey, tokenMint)
-        .accountsPartial({ payer: kp.publicKey, deposit })
+        .accountsPartial({ payer: kp.publicKey, deposit, validator: ER_VALIDATOR })
         .signers([kp])
         .rpc({ skipPreflight: true });
     }
