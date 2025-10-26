@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-private_payments = "EnhkomtzKms55jXi3ijn9XsMKYpMT4BJjmbuDQmPo3YS"
+private_payments = "jGhY7xAfrngebRtyQ5xbNghM3rzVj84GQxZamsZ4ngD"
 
 [registry]
 url = "https://api.apr.dev"
