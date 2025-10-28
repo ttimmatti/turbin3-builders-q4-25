@@ -39,7 +39,7 @@ pub struct Stake<'info> {
     pub user_account: Account<'info, UserAccount>,
 
     #[account(
-        init_if_needed,
+        init,
         payer = user,
         seeds = [b"stake", config.key().as_ref(), asset.key().as_ref()],
         space = StakeAccount::DISCRIMINATOR.len() + StakeAccount::INIT_SPACE,
