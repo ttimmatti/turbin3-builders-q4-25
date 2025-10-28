@@ -37,9 +37,9 @@ pub mod anchor_nft_staking_q4_25 {
         ctx.accounts.mint_nft()
     }
 
-    // pub fn stake(ctx: Context<Stake>) -> Result<()> {
-    //     ctx.accounts.stake(&ctx.bumps)
-    // }
+    pub fn stake(ctx: Context<Stake>) -> Result<()> {
+        ctx.accounts.stake(ctx.bumps.stake_account)
+    }
 
     // pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
     //     ctx.accounts.unstake()
