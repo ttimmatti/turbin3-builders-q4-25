@@ -41,9 +41,9 @@ pub mod anchor_nft_staking_q4_25 {
         ctx.accounts.stake(ctx.bumps.stake_account)
     }
 
-    // pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
-    //     ctx.accounts.unstake()
-    // }
+    pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
+        ctx.accounts.unstake()
+    }
 
     // pub fn claim(ctx: Context<Claim>) -> Result<()> {
     //     ctx.accounts.claim()
