@@ -23,7 +23,7 @@ describe("anchor-nft-staking-q4-25", () => {
   // Config parameters
   const pointsPerStake = 10;
   const maxStake = 5;
-  const freezePeriod = 0; // 0 days for testing
+  const freezePeriod = 3; // 0 seconds for testing
 
   // PDAs
   let configPda: PublicKey;
@@ -234,8 +234,9 @@ describe("anchor-nft-staking-q4-25", () => {
     it("Unstake the NFT and remove FreezeDelegate plugin", async () => {
       // Wait for freeze period if needed (0 in this test)
       if (freezePeriod > 0) {
-        console.log(`Waiting for freeze period: ${freezePeriod} days`);
+        console.log(`Waiting for freeze period: ${freezePeriod} seconds`);
         // In a real test with actual freeze period, you'd need to manipulate time or wait
+        await new Promise((resolve) => setTimeout(resolve, (freezePeriod + 1) * 1000));
       }
 
       const userAccountBefore = await program.account.userAccount.fetch(
@@ -316,6 +317,9 @@ describe("anchor-nft-staking-q4-25", () => {
         userAccountPda
       );
       assert.equal(userAccountAfter.points, 0, "Points should be reset to 0");
+
+      const rewardsBalanceAfter = await connection.getTokenAccountBalance(rewardsAtaPda);
+      assert.notEqual(rewardsBalanceAfter.value.uiAmount, 0, "Rewards balance should not be 0");
 
       // Check token balance
       const rewardsAta = await connection.getAccountInfo(rewardsAtaPda);
