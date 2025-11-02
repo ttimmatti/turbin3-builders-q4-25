@@ -12,6 +12,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotent,
   createMint,
+  getAccount,
   getAssociatedTokenAddressSync,
   mintToChecked,
   TOKEN_PROGRAM_ID,
@@ -63,6 +64,7 @@ describe("private-payments", () => {
   const otherUser = otherUserKp.publicKey;
   let tokenMint: PublicKey,
     userTokenAccount: PublicKey,
+    otherUserTokenAccount: PublicKey,
     vaultPda: PublicKey,
     vaultTokenAccount: PublicKey;
   const initialAmount = 1000000;
@@ -147,6 +149,15 @@ describe("private-payments", () => {
       userKp,
       tokenMint,
       user,
+      undefined,
+      TOKEN_PROGRAM_ID
+    );
+
+    otherUserTokenAccount = await createAssociatedTokenAccountIdempotent(
+      provider.connection,
+      otherUserKp,
+      tokenMint,
+      otherUser,
       undefined,
       TOKEN_PROGRAM_ID
     );
@@ -381,5 +392,101 @@ describe("private-payments", () => {
     assert.equal(otherDepositAfter.amount.toNumber(), initialAmount / 2);
 
     console.log("Other deposit PDA transfered", otherDepositPda.toBase58());
+  });
+
+  it("Undelegate Deposits", async () => {
+    for (const { deposit, kp } of [
+      { deposit: depositPda, kp: userKp },
+      { deposit: otherDepositPda, kp: otherUserKp },
+    ]) {
+      console.log("Undelegating account", deposit.toBase58());
+
+      const sig = await ephemeralProgram.methods
+        .undelegate()
+        .accountsPartial({ payer: kp.publicKey, user: kp.publicKey, sessionToken: null, deposit })
+        .signers([kp])
+        .rpc();
+      console.log("Sig undelegate", sig);
+      await ephemeralProvider.connection.confirmTransaction(sig);
+
+      console.log("Undelegated account", deposit.toBase58());
+    }
+  });
+
+  it("Withdraw from deposit", async () => {
+    // // Used to force fetching accounts from the base validator
+    // try {
+    //   await provider.connection.requestAirdrop(depositPda, 1000);
+    // } catch (error) {
+    //   // fails to airdrop but loads the accounts into the er
+    //   // console.log("Error airdropping deposit PDA", error);
+    // }
+    // try {
+    //   await provider.connection.requestAirdrop(otherDepositPda, 1000);
+    // } catch (error) {
+    //   // fails to airdrop but loads the accounts into the er
+    //   // console.log("Error airdropping other deposit PDA", error);
+    // }
+
+    const depositBefore = await program.account.deposit.fetch(depositPda);
+    console.log("Deposit before", depositBefore.amount.toNumber());
+
+    let sig = await program.methods
+      .modifyBalance({
+        amount: new anchor.BN(initialAmount / 2),
+        increase: false,
+      })
+      .accountsStrict({
+        user,
+        payer: user,
+        deposit: depositPda,
+        userTokenAccount,
+        vault: vaultPda,
+        vaultTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+
+    const depositAfter = await program.account.deposit.fetch(depositPda);
+    const userAfter = await getAccount(provider.connection, userTokenAccount);
+    console.log("Deposit after", depositAfter.amount.toNumber());
+    console.log("User after", userAfter.amount);
+    assert.equal(depositAfter.amount.toNumber(), 0);
+    assert.equal(Number(userAfter.amount), initialAmount / 2);
+
+    const otherDepositBefore = await program.account.deposit.fetch(otherDepositPda);
+    console.log("Other deposit before", otherDepositBefore.amount.toNumber());
+
+    sig = await program.methods
+      .modifyBalance({
+        amount: new anchor.BN(initialAmount / 2),
+        increase: false,
+      })
+      .accountsStrict({
+        user: otherUser,
+        payer: otherUser,
+        deposit: otherDepositPda,
+        userTokenAccount: otherUserTokenAccount,
+        vault: vaultPda,
+        vaultTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([otherUserKp])
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+
+    const otherDepositAfter = await program.account.deposit.fetch(otherDepositPda);
+    const otherUserAfter = await getAccount(provider.connection, otherUserTokenAccount);
+    console.log("Other deposit after", otherDepositAfter.amount.toNumber());
+    console.log("Other user after", otherUserAfter.amount);
+    assert.equal(otherDepositAfter.amount.toNumber(), 0);
+    assert.equal(Number(otherUserAfter.amount), initialAmount / 2);
   });
 });
