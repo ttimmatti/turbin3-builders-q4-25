@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, web3 } from "@coral-xyz/anchor";
+import anchorCounterIdl from "../target/idl/anchor_counter.json";
 import { AnchorCounter } from "../target/types/anchor_counter";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { GetCommitmentSignature } from "@magicblock-labs/ephemeral-rollups-sdk";
@@ -9,21 +10,21 @@ const SEED_TEST_PDA = "test-pda"; // 5fSfSTkNZ4czi3w5bRyDaC8dLretQv9Zy77KRBXQ7Zz
 describe.only("anchor-counter", () => {
   console.log("anchor-counter.ts");
 
-  // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
-
-  const providerEphemeralRollup = new anchor.AnchorProvider(
-    new anchor.web3.Connection(
-      process.env.EPHEMERAL_PROVIDER_ENDPOINT ||
-        "https://devnet-as.magicblock.app/",
-      {
-        wsEndpoint:
-          process.env.EPHEMERAL_WS_ENDPOINT || "wss://devnet-as.magicblock.app/",
-      },
-    ),
-    anchor.Wallet.local(),
+  const wallet = anchor.Wallet.local();
+  const provider = new anchor.AnchorProvider(
+    new anchor.web3.Connection("http://localhost:8899", {
+      wsEndpoint: "ws://localhost:8900",
+    }),
+    wallet
   );
+  const providerEphemeralRollup = new anchor.AnchorProvider(
+    new anchor.web3.Connection("http://localhost:7799", {
+      wsEndpoint: "ws://localhost:7800",
+    }),
+    wallet
+  );
+  anchor.setProvider(provider);
+  
   console.log("Base Layer Connection: ", provider.connection.rpcEndpoint);
   console.log(
     "Ephemeral Rollup Connection: ",
@@ -38,7 +39,7 @@ describe.only("anchor-counter", () => {
     console.log("Current balance is", balance / LAMPORTS_PER_SOL, " SOL", "\n");
   });
 
-  const program = anchor.workspace.AnchorCounter as Program<AnchorCounter>;
+  const program = new Program<AnchorCounter>(anchorCounterIdl, provider);
   const [pda] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from(SEED_TEST_PDA)],
     program.programId,
