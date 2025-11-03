@@ -3,6 +3,7 @@
   "license": "ISC",
   "scripts": {
     "test": "anchor test --skip-local-validator --skip-deploy --skip-build",
+    "test-session": "anchor run test-session -- --skip-local-validator --skip-deploy --skip-build",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "init-app": "cd app && yarn install",
@@ -11,6 +12,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "0.31.1",
     "@magicblock-labs/ephemeral-rollups-sdk": "^0.2.11",
+    "@magicblock-labs/gum-sdk": "^3.0.8",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.0"
   },
