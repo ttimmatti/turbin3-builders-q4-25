@@ -414,20 +414,6 @@ describe("private-payments", () => {
   });
 
   it("Withdraw from deposit", async () => {
-    // // Used to force fetching accounts from the base validator
-    // try {
-    //   await provider.connection.requestAirdrop(depositPda, 1000);
-    // } catch (error) {
-    //   // fails to airdrop but loads the accounts into the er
-    //   // console.log("Error airdropping deposit PDA", error);
-    // }
-    // try {
-    //   await provider.connection.requestAirdrop(otherDepositPda, 1000);
-    // } catch (error) {
-    //   // fails to airdrop but loads the accounts into the er
-    //   // console.log("Error airdropping other deposit PDA", error);
-    // }
-
     const depositBefore = await program.account.deposit.fetch(depositPda);
     console.log("Deposit before", depositBefore.amount.toNumber());
 
