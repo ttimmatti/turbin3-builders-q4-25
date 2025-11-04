@@ -62,13 +62,15 @@ describe("anchor-dice-game-q4-25", () => {
       message: account.data.subarray(8)
     });
 
-    const resolve_ix = await program.methods.resolveBet(Buffer.from(sig_ix.data.buffer.slice(16+32, 16+32+64))).accounts({
+    const resolve_ix = await program.methods
+      .resolveBet(Buffer.from(sig_ix.data.buffer.slice(16+32, 16+32+64)))
+      .accountsStrict({
         player: player.publicKey,
         house: house.publicKey,
         vault,
         bet,
         instructionSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram:SystemProgram.programId 
+        systemProgram: SystemProgram.programId 
       }
     )
     .signers([
