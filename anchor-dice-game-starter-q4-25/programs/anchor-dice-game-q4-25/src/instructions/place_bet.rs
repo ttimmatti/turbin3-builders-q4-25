@@ -18,7 +18,7 @@ pub struct PlaceBet<'info> {
     #[account(
         init,
         payer = player,
-        space = Bet::Discriminator.len() + Bet::INIT_SPACE,
+        space = Bet::DISCRIMINATOR.len() + Bet::INIT_SPACE,
         seeds = [b"bet", vault.key().as_ref(), seed.to_le_bytes().as_ref()],
         bump
     )]
@@ -27,7 +27,7 @@ pub struct PlaceBet<'info> {
 }
 
 impl<'info> PlaceBet<'info> {
-    pub fn create_bet(&mut self, bumps: &PlaceBetBumps, seed: u128, roll: u8, amount: u64) -> Result<()> {
+    pub fn create_bet(&mut self, seed: u128, roll: u8, amount: u64, bumps: &PlaceBetBumps) -> Result<()> {
         self.bet.set_inner(Bet{
             slot : Clock::get()?.slot,
             player: self.player.key(),
