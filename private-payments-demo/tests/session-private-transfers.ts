@@ -78,6 +78,10 @@ describe("session-private-transfers", () => {
   const groupId = PublicKey.unique();
   const otherGroupId = PublicKey.unique();
   let depositPda: PublicKey, otherDepositPda: PublicKey;
+  let sessionKp: Keypair, sessionToken: PublicKey;
+  let otherSessionKp: Keypair, otherSessionToken: PublicKey;
+
+  const sessionManager = new SessionTokenManager(wallet, provider.connection);
 
   before(async () => {
     const faucet = anchor.Wallet.local();
@@ -202,10 +206,115 @@ describe("session-private-transfers", () => {
     console.log("Other group ID", otherGroupId.toBase58());
   });
 
+  it("Initialize deposits", async () => {
+    let sig = await program.methods
+      .initializeDeposit()
+      .accountsStrict({
+        payer: user,
+        user,
+        deposit: depositPda,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+
+    let deposit = await program.account.deposit.fetch(depositPda);
+    assert.equal(deposit.amount.toNumber(), 0);
+
+    sig = await program.methods
+      .initializeDeposit()
+      .accountsStrict({
+        payer: otherUser,
+        user: otherUser,
+        deposit: otherDepositPda,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([otherUserKp])
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+
+    deposit = await program.account.deposit.fetch(otherDepositPda);
+    assert.equal(deposit.amount.toNumber(), 0);
+  });
+
+  it("Modify balance", async () => {
+    let sig = await program.methods
+      .modifyBalance({
+        amount: new anchor.BN(initialAmount / 2),
+        increase: true,
+      })
+      .accountsStrict({
+        user,
+        payer: user,
+        deposit: depositPda,
+        userTokenAccount,
+        vault: vaultPda,
+        vaultTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+
+    let deposit = await program.account.deposit.fetch(depositPda);
+    assert.equal(deposit.amount.toNumber(), initialAmount / 2);
+
+    sig = await program.methods
+      .modifyBalance({
+        amount: new anchor.BN(initialAmount / 4),
+        increase: false,
+      })
+      .accountsStrict({
+        user,
+        payer: user,
+        deposit: depositPda,
+        userTokenAccount,
+        vault: vaultPda,
+        vaultTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+
+    deposit = await program.account.deposit.fetch(depositPda);
+    assert.equal(deposit.amount.toNumber(), initialAmount / 4);
+
+    sig = await program.methods
+      .modifyBalance({
+        amount: new anchor.BN((3 * initialAmount) / 4),
+        increase: true,
+      })
+      .accountsStrict({
+        user,
+        payer: user,
+        deposit: depositPda,
+        userTokenAccount,
+        vault: vaultPda,
+        vaultTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+    
+    deposit = await program.account.deposit.fetch(depositPda);
+    assert.equal(deposit.amount.toNumber(), initialAmount);
+  });
+
   it("Create session", async () => {
-    const sessionKp = Keypair.generate();
-    const sessionManager = new SessionTokenManager(wallet, provider.connection);
-    const sessionToken = PublicKey.findProgramAddressSync(
+    sessionKp = Keypair.generate();
+    sessionToken = PublicKey.findProgramAddressSync(
       [
         Buffer.from("session_token"),
         program.programId.toBuffer(),
@@ -231,5 +340,223 @@ describe("session-private-transfers", () => {
       sessionToken
     );
     console.log("Session", session);
+
+    otherSessionKp = Keypair.generate();
+    otherSessionToken = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("session_token"),
+        program.programId.toBuffer(),
+        otherSessionKp.publicKey.toBuffer(),
+        otherUserKp.publicKey.toBuffer(),
+      ],
+      sessionManager.program.programId
+    )[0];
+    const otherSessionSig = await sessionManager.program.methods
+      .createSession(true, null, null)
+      .accountsPartial({
+        sessionToken: otherSessionToken,
+        sessionSigner: otherSessionKp.publicKey,
+        authority: otherUserKp.publicKey,
+        targetProgram: program.programId,
+      })
+      .signers([otherUserKp, otherSessionKp])
+      .rpc();
+    await provider.connection.confirmTransaction(otherSessionSig);
+    console.log("Sig create session", otherSessionSig);
+
+    const otherSession = await sessionManager.program.account.sessionToken.fetch(
+      otherSessionToken
+    );
+    console.log("Other session", otherSession);
+  });
+
+  it("Create permission", async () => {
+    for (const { deposit, kp, id } of [
+      { deposit: depositPda, kp: userKp, id: groupId },
+      { deposit: otherDepositPda, kp: otherUserKp, id: otherGroupId },
+    ]) {
+      const permission = permissionPdaFromAccount(deposit);
+      console.log("Permission", permission.toBase58());
+      const group = groupPdaFromId(id);
+      console.log("Group", group.toBase58());
+
+      const sig = await program.methods
+        .createPermission(id)
+        .accountsPartial({
+          payer: kp.publicKey,
+          user: kp.publicKey,
+          deposit,
+          permission,
+          group,
+          permissionProgram: PERMISSION_PROGRAM_ID,
+        })
+        .signers([kp])
+        .rpc();
+      console.log("Sig create permission", sig);
+    }
+  });
+
+  it("Delegate", async () => {
+    for (const { deposit, kp } of [
+      { deposit: depositPda, kp: userKp },
+      { deposit: otherDepositPda, kp: otherUserKp },
+    ]) {
+      console.log("Delegating account", deposit.toBase58());
+
+      const sig = await program.methods
+        .delegate(kp.publicKey, tokenMint)
+        .accountsPartial({ payer: kp.publicKey, deposit, validator: LOCALNET_ER_VALIDATOR })
+        .signers([kp])
+        .rpc({ skipPreflight: true });
+      console.log("Sig", sig);
+      await provider.connection.confirmTransaction(sig);
+
+      console.log("Delegated account", deposit.toBase58());
+    }
+  });
+
+  it("Transfer", async () => {
+    // Used to force fetching accounts from the base validator
+    try {
+      await ephemeralProvider.connection.requestAirdrop(depositPda, 1000);
+    } catch (error) {
+      // fails to airdrop but loads the accounts into the er
+      // console.log("Error airdropping deposit PDA", error);
+    }
+    try {
+      await ephemeralProvider.connection.requestAirdrop(otherDepositPda, 1000);
+    } catch (error) {
+      // fails to airdrop but loads the accounts into the er
+      // console.log("Error airdropping other deposit PDA", error);
+    }
+
+    const depositBefore = await ephemeralProgram.account.deposit.fetch(depositPda);
+    console.log("Deposit before", depositBefore.amount.toNumber());
+
+    const otherDepositBefore = await ephemeralProgram.account.deposit.fetch(otherDepositPda);
+    console.log("Other deposit before", otherDepositBefore.amount.toNumber());
+
+    const sig = await ephemeralProgram.methods
+      .transferDeposit(new anchor.BN(initialAmount / 2))
+      .accountsStrict({
+        user,
+        payer: sessionKp.publicKey,
+        sourceDeposit: depositPda,
+        destinationDeposit: otherDepositPda,
+        tokenMint,
+        systemProgram: SystemProgram.programId,
+        sessionToken,
+      })
+      .signers([sessionKp])
+      .rpc();
+    console.log("Sig", sig);
+    await ephemeralProvider.connection.confirmTransaction(sig);
+
+    const userDepositAfter = await ephemeralProgram.account.deposit.fetch(depositPda);
+    console.log("Deposit after", userDepositAfter.amount.toNumber());
+    assert.equal(userDepositAfter.amount.toNumber(), initialAmount / 2);
+
+    const otherDepositAfter = await ephemeralProgram.account.deposit.fetch(otherDepositPda);
+    console.log("Other deposit after", otherDepositAfter.amount.toNumber());
+    assert.equal(otherDepositAfter.amount.toNumber(), initialAmount / 2);
+
+    console.log("Other deposit PDA transfered", otherDepositPda.toBase58());
+  });
+
+  it("Undelegate Deposits", async () => {
+    for (const { deposit, kp, session, sessionKey } of [
+      { deposit: depositPda, kp: userKp, session: sessionToken, sessionKey: sessionKp },
+      { deposit: otherDepositPda, kp: otherUserKp, session: otherSessionToken, sessionKey: otherSessionKp },
+    ]) {
+      console.log("Undelegating account", deposit.toBase58());
+
+      const sig = await ephemeralProgram.methods
+        .undelegate()
+        .accountsPartial({ payer: sessionKey.publicKey, user: kp.publicKey, sessionToken: session, deposit })
+        .signers([sessionKey])
+        .rpc();
+      console.log("Sig undelegate", sig);
+      await ephemeralProvider.connection.confirmTransaction(sig, "finalized");
+
+      console.log("Undelegated account", deposit.toBase58());
+    }
+  });
+
+  it("Withdraw from deposit", async () => {
+    const depositBefore = await program.account.deposit.fetch(depositPda);
+    console.log("Deposit before", depositBefore.amount.toNumber());
+
+    // Wait for the undelegation to be complete
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    let sig = await program.methods
+      .modifyBalance({
+        amount: new anchor.BN(initialAmount / 2),
+        increase: false,
+      })
+      .accountsStrict({
+        user,
+        payer: user,
+        deposit: depositPda,
+        userTokenAccount,
+        vault: vaultPda,
+        vaultTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+    console.log("Sig", sig);
+
+    const depositAfter = await program.account.deposit.fetch(depositPda);
+    const userAfter = await getAccount(provider.connection, userTokenAccount);
+    console.log("Deposit after", depositAfter.amount.toNumber());
+    console.log("User after", userAfter.amount);
+    assert.equal(depositAfter.amount.toNumber(), 0);
+    assert.equal(Number(userAfter.amount), initialAmount / 2);
+
+    const otherDepositBefore = await program.account.deposit.fetch(otherDepositPda);
+    console.log("Other deposit before", otherDepositBefore.amount.toNumber());
+
+    sig = await program.methods
+      .modifyBalance({
+        amount: new anchor.BN(initialAmount / 2),
+        increase: false,
+      })
+      .accountsStrict({
+        user: otherUser,
+        payer: otherUser,
+        deposit: otherDepositPda,
+        userTokenAccount: otherUserTokenAccount,
+        vault: vaultPda,
+        vaultTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([otherUserKp])
+      .rpc({ skipPreflight: true });
+    console.log("Sig", sig);
+
+    const otherDepositAfter = await program.account.deposit.fetch(otherDepositPda);
+    const otherUserAfter = await getAccount(provider.connection, otherUserTokenAccount);
+    console.log("Other deposit after", otherDepositAfter.amount.toNumber());
+    console.log("Other user after", otherUserAfter.amount);
+    assert.equal(otherDepositAfter.amount.toNumber(), 0);
+    assert.equal(Number(otherUserAfter.amount), initialAmount / 2);
+  });
+
+  it("Revoke session", async () => {
+    const revokeSessionSig = await sessionManager.program.methods
+      .revokeSession()
+      .accountsPartial({
+        sessionToken,
+        authority: wallet.publicKey,
+      })
+      .rpc();
+    await provider.connection.confirmTransaction(revokeSessionSig);
+    console.log("Sig revoke session", revokeSessionSig);
   });
 });
