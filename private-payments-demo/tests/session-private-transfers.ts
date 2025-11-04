@@ -49,14 +49,14 @@ describe("session-private-transfers", () => {
   const provider = new anchor.AnchorProvider(
     new anchor.web3.Connection("http://localhost:8899", {
       wsEndpoint: "ws://localhost:8900",
-      commitment: "confirmed",
+      commitment: "processed",
     }),
     wallet
   );
   const ephemeralProvider = new anchor.AnchorProvider(
     new anchor.web3.Connection("http://localhost:7799", {
       wsEndpoint: "ws://localhost:7800",
-      commitment: "confirmed",
+      commitment: "processed",
     }),
     wallet
   );
@@ -110,7 +110,96 @@ describe("session-private-transfers", () => {
     }
     if (balance === 0) throw new Error("airdrop failed...");
 
-    
+    console.log("Creating mint...");
+    tokenMint = await createMint(
+      provider.connection,
+      userKp,
+      user,
+      null,
+      6,
+      undefined,
+      undefined,
+      TOKEN_PROGRAM_ID
+    );
+
+    while ((await provider.connection.getAccountInfo(tokenMint)) === null) {
+      console.log("Waiting for mint to be created...");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    depositPda = PublicKey.findProgramAddressSync(
+      [Buffer.from(DEPOSIT_PDA_SEED), user.toBuffer(), tokenMint.toBuffer()],
+      program.programId
+    )[0];
+    otherDepositPda = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(DEPOSIT_PDA_SEED),
+        otherUser.toBuffer(),
+        tokenMint.toBuffer(),
+      ],
+      program.programId
+    )[0];
+    vaultPda = PublicKey.findProgramAddressSync(
+      [Buffer.from(VAULT_PDA_SEED), tokenMint.toBuffer()],
+      program.programId
+    )[0];
+    vaultTokenAccount = getAssociatedTokenAddressSync(
+      tokenMint,
+      vaultPda,
+      true,
+      TOKEN_PROGRAM_ID
+    );
+
+    console.log("Creating user token account...");
+    userTokenAccount = await createAssociatedTokenAccountIdempotent(
+      provider.connection,
+      userKp,
+      tokenMint,
+      user,
+      undefined,
+      TOKEN_PROGRAM_ID
+    );
+
+    otherUserTokenAccount = await createAssociatedTokenAccountIdempotent(
+      provider.connection,
+      otherUserKp,
+      tokenMint,
+      otherUser,
+      undefined,
+      TOKEN_PROGRAM_ID
+    );
+
+    while (
+      (await provider.connection.getAccountInfo(userTokenAccount)) === null
+    ) {
+      console.log("Waiting for user token account to be created...");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    console.log("Minting tokens to user...");
+    // Mint tokens to the user
+    await mintToChecked(
+      provider.connection,
+      userKp,
+      tokenMint,
+      userTokenAccount,
+      user,
+      new anchor.BN(initialAmount) as any,
+      6,
+      undefined,
+      undefined,
+      TOKEN_PROGRAM_ID
+    );
+
+    console.log("User token account", userTokenAccount.toBase58());
+    console.log("Vault token account", vaultTokenAccount.toBase58());
+    console.log("Deposit PDA", depositPda.toBase58());
+    console.log("Other deposit PDA", otherDepositPda.toBase58());
+    console.log("User", user.toBase58());
+    console.log("Other user", otherUser.toBase58());
+    console.log("Token mint", tokenMint.toBase58());
+    console.log("Group ID", groupId.toBase58());
+    console.log("Other group ID", otherGroupId.toBase58());
   });
 
   it("Create session", async () => {
@@ -134,10 +223,7 @@ describe("session-private-transfers", () => {
         targetProgram: program.programId,
       })
       .signers([userKp, sessionKp])
-      .rpc({ skipPreflight: true });
-    // const sig = await provider.connection.sendRawTransaction(
-    //   createSessionTx.serialize()
-    // );
+      .rpc();
     await provider.connection.confirmTransaction(sig);
     console.log("Sig create session", sig);
 
