@@ -9,7 +9,7 @@ use magicblock_permission_client::instructions::{
 };
 use session_keys::{SessionError, SessionToken, session_auth_or, Session};
 
-declare_id!("jGhY7xAfrngebRtyQ5xbNghM3rzVj84GQxZamsZ4ngD");
+declare_id!("3Qu3rYLyv2BCjkpBGufgnyjtHAvEzgKVR5AHMpgAaGqS");
 
 pub const DEPOSIT_PDA_SEED: &[u8] = b"deposit";
 pub const VAULT_PDA_SEED: &[u8] = b"vault";

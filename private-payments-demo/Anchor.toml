@@ -5,19 +5,23 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
+[programs.devnet]
+private_payments = "3Qu3rYLyv2BCjkpBGufgnyjtHAvEzgKVR5AHMpgAaGqS"
+
 [programs.localnet]
-private_payments = "jGhY7xAfrngebRtyQ5xbNghM3rzVj84GQxZamsZ4ngD"
+private_payments = "3Qu3rYLyv2BCjkpBGufgnyjtHAvEzgKVR5AHMpgAaGqS"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 test-session = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/session-private-transfers.ts"
+test-tee-devnet = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/private-payments-tee-devnet.ts"
 
 [test]
 startup_wait = 5000
