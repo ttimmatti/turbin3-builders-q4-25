@@ -1,0 +1,3 @@
+[submodule "capstone-stealth-trade"]
+	path = capstone-stealth-trade
+	url = https://github.com/ttimmatti/stealth-trade
